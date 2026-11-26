@@ -521,6 +521,33 @@ static int filter_(const double* x, const double* P, const double* H, const doub
     free(I);
     return info;
 }
+
+/* Joseph covariance update: Pp=A*P*A'+K*R*K', where A=I-K*H'. */
+static int filterjos(const double* x, const double* P, const double* H, const double* v, const double* R, int n, int m,
+                     double* xp, double* Pp) {
+    double *F = mat(n, m), *Q = mat(m, m), *K = mat(n, m), *A = eye(n), *AP = mat(n, n);
+    int info;
+
+    matcpy(Q, R, m, m);
+    matmul("NN", n, m, n, 1.0, P, H, 0.0, F); /* Q=H'*P*H+R */
+    matmul("TN", m, m, n, 1.0, H, F, 1.0, Q);
+    if (!(info = matinv(Q, m))) {
+        matcpy(xp, x, n, 1);
+        matmul("NN", n, m, m, 1.0, F, Q, 0.0, K);  /* K=P*H*Q^-1 */
+        matmul("NN", n, 1, m, 1.0, K, v, 1.0, xp); /* xp=x+K*v */
+        matmul("NT", n, n, m, -1.0, K, H, 1.0, A); /* A=I-K*H' */
+        matmul("NN", n, n, n, 1.0, A, P, 0.0, AP);
+        matmul("NT", n, n, n, 1.0, AP, A, 0.0, Pp);
+        matmul("NN", n, m, m, 1.0, K, R, 0.0, F);
+        matmul("NT", n, n, m, 1.0, F, K, 1.0, Pp); /* Pp=A*P*A'+K*R*K' */
+    }
+    free(F);
+    free(Q);
+    free(K);
+    free(A);
+    free(AP);
+    return info;
+}
 extern int filter(double* x, double* P, const double* H, const double* v, const double* R, int n, int m) {
     double *x_, *xp_, *P_, *Pp_, *H_;
     int i, j, k, info, *ix;
@@ -545,11 +572,12 @@ extern int filter(double* x, double* P, const double* H, const double* v, const 
             H_[i + j * k] = H[ix[i] + j * n];
         }
     }
-    info = filter_(x_, P_, H_, v, R, k, m, xp_, Pp_);
-    for (i = 0; i < k; i++) {
-        x[ix[i]] = xp_[i];
-        for (j = 0; j < k; j++) {
-            P[ix[i] + ix[j] * n] = Pp_[i + j * k];
+    if (!(info = filterjos(x_, P_, H_, v, R, k, m, xp_, Pp_))) {
+        for (i = 0; i < k; i++) {
+            x[ix[i]] = xp_[i];
+            for (j = 0; j < k; j++) {
+                P[ix[i] + ix[j] * n] = Pp_[i + j * k];
+            }
         }
     }
     free(ix);
