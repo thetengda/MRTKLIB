@@ -190,7 +190,8 @@ int lsq(const double* A, const double* y, int n, int m, double* x, double* Q);
 /**
  * @brief Kalman filter state update.
  *
- * K=P*H*(H'*P*H+R)^-1, xp=x+K*v, Pp=(I-K*H')*P
+ * K=P*H*(H'*P*H+R)^-1, xp=x+K*v
+ * A=I-K*H', Pp=A*P*A'+K*R*K' (Joseph form)
  *
  * @param[in,out] x  States vector (n x 1)
  * @param[in,out] P  Covariance matrix of states (n x n)
@@ -199,7 +200,7 @@ int lsq(const double* A, const double* y, int n, int m, double* x, double* Q);
  * @param[in]     R  Covariance matrix of measurement error (m x m)
  * @param[in]     n  Number of states
  * @param[in]     m  Number of measurements
- * @return Status (0:ok, <0:error)
+ * @return Status (0:ok, nonzero:error). The inputs are unchanged on error.
  * @note Matrix stored by column-major order (Fortran convention).
  *       If state x[i]==0.0, does not update state x[i]/P[i+i*n].
  */
